@@ -2,6 +2,7 @@ package me.minebuilders.hg;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.logging.Logger;
 
 import org.bukkit.Bukkit;
@@ -77,17 +78,15 @@ public class Util {
 		p.updateInventory();
 	}
 
-	public static String translateStop(List<String> win) {
-		String bc = null;
-		int count = 0;
-		for (String s : win) {
-			count++;
-			if (count == 1) bc = s;
-			else if (count == win.size()) bc = bc + ", and " + s;
-			else bc = bc + ", " + s;
-		}
-		return bc;
-	}
+    public static String translateStop(List<UUID> win) {
+        String bc = null;
+        int count = 0;
+        for (UUID s : win) {
+            Player player = Bukkit.getPlayer((UUID)s);
+            bc = ++count == 1 ? player.getName() : (count == win.size() ? String.valueOf(bc) + ", and " + player.getName() : String.valueOf(bc) + ", " + player.getName());
+        }
+        return bc;
+    }
 
 	public static void shootFirework(Location l) {
 		Firework fw = (Firework) l.getWorld().spawn(l, Firework.class);

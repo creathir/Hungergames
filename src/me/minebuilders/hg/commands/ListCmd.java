@@ -16,8 +16,8 @@ public class ListCmd extends BaseCmd {
 	@Override
 	public boolean run() {
 		String p = "";
-		Game g = HG.plugin.players.get(player.getName()).getGame();
-		for (String s : g.getPlayers()) {
+		Game g = HG.plugin.players.get(player.getUniqueId()).getGame();
+		for (String s : g.getPlayerNames()) {
 			p = p + "&3, &b" + s;
 		}
 		p = p.substring(3);

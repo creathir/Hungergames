@@ -2,6 +2,7 @@ package me.minebuilders.hg.tasks;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 import me.minebuilders.hg.ChestDrop;
 import me.minebuilders.hg.Config;
@@ -55,7 +56,7 @@ public class ChestDropTask implements Runnable {
 
 		chests.add(new ChestDrop(fb));
 
-		for (String s : g.getPlayers()) {
+		for (UUID s : g.getPlayers()) {
 			Player p = Bukkit.getPlayer(s);
 			if (p != null) {
 			Util.scm(p, "&6*&b&m                                                                             &6*");

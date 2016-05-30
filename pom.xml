@@ -3,37 +3,26 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>me.minebuilders</groupId>
 	<artifactId>Hungergames</artifactId>
-	<version>3.0</version>
+	<version>3.2</version>
 	<name>Hungergames</name>
 	<description>Bukkit hungergames plugin</description>
-
+	<properties>
+    	<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  	</properties>
 	<repositories>
-		<!-- Bukkit -->
-		<repository>
-			<id>bukkit-repo</id>
-			<url>http://repo.bukkit.org/content/groups/public/</url>
-		</repository>
-		
-		<!-- Vault -->
-	    <repository>
-	        <id>vault-repo</id>
-	        <url>http://ci.herocraftonline.com/plugin/repository/everything</url>
+        <repository>
+            <id>vault-repo</id>
+            <url>http://nexus.theyeticave.net/content/repositories/pub_releases</url>
         </repository>
-	</repositories>
-
-	<dependencies>
-		<dependency>
-			<groupId>org.bukkit</groupId>
-			<artifactId>bukkit</artifactId>
-			<version>1.7.2-R0.1-SNAPSHOT</version>
-		</dependency>
-		
-	   <dependency>
-			<groupId>net.milkbowl.vault</groupId>
-			<artifactId>Vault</artifactId>
-			<version>1.2.27</version>
-		</dependency>
-	</dependencies>
+    </repositories>
+    <dependencies>
+        <dependency>
+            <groupId>net.milkbowl.vault</groupId>
+            <artifactId>VaultAPI</artifactId>
+            <version>1.5</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
 
 	<build>
 		<finalName>${project.name}</finalName>

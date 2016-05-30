@@ -3,464 +3,498 @@ package me.minebuilders.hg;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map.Entry;
-
+import java.util.Map;
+import java.util.UUID;
+import me.minebuilders.hg.Bound;
+import me.minebuilders.hg.Config;
+import me.minebuilders.hg.HG;
+import me.minebuilders.hg.PlayerData;
+import me.minebuilders.hg.SBDisplay;
+import me.minebuilders.hg.Status;
+import me.minebuilders.hg.Team;
+import me.minebuilders.hg.Util;
+import me.minebuilders.hg.Vault;
 import me.minebuilders.hg.mobhandler.Spawner;
 import me.minebuilders.hg.tasks.ChestDropTask;
 import me.minebuilders.hg.tasks.FreeRoamTask;
 import me.minebuilders.hg.tasks.StartingTask;
 import me.minebuilders.hg.tasks.TimerTask;
-
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.BlockState;
 import org.bukkit.block.Sign;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
 public class Game {
+    private String name;
+    private List<Location> spawns;
+    private Bound b;
+    private List<UUID> players = new ArrayList<UUID>();
+    private ArrayList<Location> chests = new ArrayList<Location>();
+    private List<BlockState> blocks = new ArrayList<BlockState>();
+    private Location exit;
+    private Status status;
+    private int minplayers;
+    private int maxplayers;
+    private int time;
+    private Sign s;
+    private Sign s1;
+    private Sign s2;
+    private int roamtime;
+    private SBDisplay sb;
+    private Spawner spawner;
+    private FreeRoamTask freeroam;
+    private StartingTask starting;
+    private TimerTask timer;
+    private ChestDropTask chestdrop;
 
-	private String name;
-	private List<Location> spawns;
-	private Bound b;
-	private List<String> players = new ArrayList<String>();
-	private ArrayList<Location> chests = new ArrayList<Location>();
-	private List<BlockState> blocks = new ArrayList<BlockState>();
-	private Location exit;
-	private Status status;
-	private int minplayers;
-	private int maxplayers;
-	private int time;
-	private Sign s;
-	private Sign s1;
-	private Sign s2;
-	private int roamtime;
-	private SBDisplay sb;
+    public Game(String s, Bound bo, List<Location> spawns, Sign lobbysign, int timer, int minplayers, int maxplayers, int roam, boolean isready) {
+        this.name = s;
+        this.b = bo;
+        this.spawns = spawns;
+        this.s = lobbysign;
+        this.time = timer;
+        this.minplayers = minplayers;
+        this.maxplayers = maxplayers;
+        this.roamtime = roam;
+        this.status = isready ? Status.STOPPED : Status.BROKEN;
+        this.setChests();
+        this.setLobbyBlock(lobbysign);
+        this.sb = new SBDisplay(this);
+    }
 
-	// Task ID's here!
-	private Spawner spawner;
-	private FreeRoamTask freeroam;
-	private StartingTask starting;
-	private TimerTask timer;
-	private ChestDropTask chestdrop;
+    public Game(String s, Bound c, int timer, int minplayers, int maxplayers, int roam) {
+        this.name = s;
+        this.time = timer;
+        this.minplayers = minplayers;
+        this.maxplayers = maxplayers;
+        this.roamtime = roam;
+        this.spawns = new ArrayList<Location>();
+        this.b = c;
+        this.status = Status.NOTREADY;
+        this.setChests();
+        this.sb = new SBDisplay(this);
+    }
 
-	public Game(String s, Bound bo, List<Location> spawns, Sign lobbysign, int timer, int minplayers, int maxplayers, int roam, boolean isready) {
-		this.name = s;
-		this.b = bo;
-		this.spawns = spawns;
-		this.s = lobbysign;
-		this.time = timer;
-		this.minplayers = minplayers;
-		this.maxplayers = maxplayers;
-		this.roamtime = roam;
+    public Bound getRegion() {
+        return this.b;
+    }
 
-		if (isready) status = Status.STOPPED;
-		else status = Status.BROKEN;
+    public void forceRollback() {
+        Collections.reverse(this.blocks);
+        for (BlockState st : this.blocks) {
+            st.update(true);
+        }
+    }
 
-		setChests();
-		setLobbyBlock(lobbysign);
+    public void setStatus(Status st) {
+        this.status = st;
+        this.updateLobbyBlock();
+    }
 
-		sb = new SBDisplay(this);
-	}
+    public void addState(BlockState s) {
+        if (s.getType() != Material.AIR) {
+            this.blocks.add(s);
+        }
+    }
 
-	public Game(String s, Bound c, int timer, int minplayers, int maxplayers, int roam) {
-		this.name = s;
-		this.time = timer;
-		this.minplayers = minplayers;
-		this.maxplayers = maxplayers;
-		this.roamtime = roam;
-		this.spawns = new ArrayList<Location>();
-		this.b = c;
-		status = Status.NOTREADY;
-		setChests();
-		sb = new SBDisplay(this);
-	}
+    public void recordBlockBreak(Block bl) {
+        Block top = bl.getRelative(BlockFace.UP);
+        if (!top.getType().isSolid() || !top.getType().isBlock()) {
+            this.addState(bl.getRelative(BlockFace.UP).getState());
+        }
+        BlockFace[] arrblockFace = Util.faces;
+        int n = arrblockFace.length;
+        int n2 = 0;
+        while (n2 < n) {
+            BlockFace bf = arrblockFace[n2];
+            Block rel = bl.getRelative(bf);
+            if (Util.isAttached(bl, rel)) {
+                this.addState(rel.getState());
+            }
+            ++n2;
+        }
+        this.addState(bl.getState());
+    }
 
-	public Bound getRegion() {
-		return b;
-	}
+    public void recordBlockPlace(BlockState bs) {
+        this.blocks.add(bs);
+    }
 
-	public void forceRollback() {
-		Collections.reverse(blocks);
-		for (BlockState st : blocks) {
-			st.update(true);
-		}
-	}
+    public Status getStatus() {
+        return this.status;
+    }
 
-	public void setStatus(Status st) {
-		this.status = st; 
-		updateLobbyBlock();
-	}
+    public List<BlockState> getBlocks() {
+        Collections.reverse(this.blocks);
+        return this.blocks;
+    }
 
-	public void addState(BlockState s) {
-		if (s.getType() != Material.AIR) {
-			blocks.add(s);
-		}
-	}
-	
-	public void recordBlockBreak(Block bl) {
-		Block top = bl.getRelative(BlockFace.UP);
+    public void resetBlocks() {
+        this.blocks.clear();
+    }
 
-		if (!top.getType().isSolid() || !top.getType().isBlock()) {
-			addState(bl.getRelative(BlockFace.UP).getState());
-		}
+    public void setChests() {
+        this.chests.clear();
+        for (Location bl : this.b.getBlocks(Material.CHEST)) {
+            this.chests.add(bl);
+        }
+    }
 
-		for (BlockFace bf : Util.faces) {
-			Block rel = bl.getRelative(bf);
+    public void msgAllMulti(String[] sta) {
+        String[] arrstring = sta;
+        int n = arrstring.length;
+        int n2 = 0;
+        while (n2 < n) {
+            String s = arrstring[n2];
+            for (UUID st : this.players) {
+                Player p = Bukkit.getPlayer((UUID)st);
+                if (p == null) continue;
+                Util.msg((CommandSender)p, s);
+            }
+            ++n2;
+        }
+    }
 
-			if (Util.isAttached(bl, rel)) {
-				addState(rel.getState());
-			}
-		}
-		addState(bl.getState());
-	}
+    public List<UUID> getPlayers() {
+        return this.players;
+    }
 
-	public void recordBlockPlace(BlockState bs) {
-		blocks.add(bs);
-	}
+    public List<String> getPlayerNames() {
+        ArrayList<String> playerNames = new ArrayList<String>();
+        for (UUID st : this.players) {
+            Player p = Bukkit.getPlayer((UUID)st);
+            if (p == null) continue;
+            playerNames.add(p.getName());
+        }
+        return playerNames;
+    }
 
-	public Status getStatus() {
-		return this.status;
-	}
+    public String getName() {
+        return this.name;
+    }
 
-	public List<BlockState> getBlocks() {
-		Collections.reverse(blocks);
-		return blocks;
-	}
+    public boolean isInRegion(Location l) {
+        return this.b.isInRegion(l);
+    }
 
-	public void resetBlocks() {
-		this.blocks.clear();
-	}
+    public List<Location> getSpawns() {
+        return this.spawns;
+    }
 
-	public void setChests() {
-		chests.clear();
-		for (Location bl : b.getBlocks(Material.CHEST)) {
-			chests.add(bl);
-		}
-	}
+    public int getRoamTime() {
+        return this.roamtime;
+    }
 
-	public void msgAllMulti(String[] sta) {
-		for (String s : sta) {
-			for (String st : players) {
-				Player p = Bukkit.getPlayer(st);
-				if (p != null)
-					Util.msg(p, s);
-			}
-		}
-	}
+    public void join(Player p) {
+        if (this.status != Status.WAITING && this.status != Status.STOPPED && this.status != Status.COUNTDOWN) {
+            p.sendMessage((Object)ChatColor.RED + "This arena is not ready! Please wait before joining!");
+        } else if (this.maxplayers <= this.players.size()) {
+            p.sendMessage((Object)ChatColor.RED + this.name + " is currently full!");
+        } else {
+            if (p.isInsideVehicle()) {
+                p.leaveVehicle();
+            }
+            this.players.add(p.getUniqueId());
+            HG.plugin.players.put(p.getUniqueId(), new PlayerData(p, this));
+            p.teleport(this.pickSpawn());
+            this.heal(p);
+            this.freeze(p);
+            if (this.players.size() >= this.minplayers && this.status.equals((Object)Status.WAITING)) {
+                this.startPreGame();
+            } else if (this.status == Status.WAITING) {
+                this.msgDef("&4(&3" + p.getName() + "&b Has joined the game" + (this.minplayers - this.players.size() <= 0 ? "!" : new StringBuilder(": ").append(this.minplayers - this.players.size()).append(" players to start!").toString()) + "&4)");
+            }
+            this.kitHelp(p);
+            if (this.players.size() == 1) {
+                this.status = Status.WAITING;
+            }
+            this.updateLobbyBlock();
+            this.sb.setSB(p);
+            this.sb.setAlive();
+        }
+    }
 
-	public List<String> getPlayers() {
-		return players;
-	}
+    public void kitHelp(Player p) {
+        String kit = HG.plugin.kit.getKitList();
+        Util.scm((CommandSender)p, "&8     ");
+        Util.scm((CommandSender)p, "&9&l>----------[&b&lWelcome to HungerGames&9&l]----------<");
+        Util.scm((CommandSender)p, "&9&l - &bPick a kit using &c/hg kit <kit-name>");
+        Util.scm((CommandSender)p, "&9&lKits:&b" + kit);
+        Util.scm((CommandSender)p, "&9&l>------------------------------------------<");
+    }
 
-	public String getName() {
-		return this.name;
-	}
+    public void respawnAll() {
+        for (UUID st : this.players) {
+            Player p = Bukkit.getPlayer((UUID)st);
+            if (p == null) continue;
+            p.teleport(this.pickSpawn());
+        }
+    }
 
-	public boolean isInRegion(Location l) {
-		return b.isInRegion(l);
-	}
+    public void startPreGame() {
+        this.setStatus(Status.COUNTDOWN);
+        this.starting = new StartingTask(this);
+        this.updateLobbyBlock();
+    }
 
-	public List<Location> getSpawns() {
-		return spawns;
-	}
+    public void startFreeRoam() {
+        this.status = Status.BEGINNING;
+        HG.manager.restoreChests(this);
+        this.b.removeEntities();
+        this.freeroam = new FreeRoamTask(this);
+    }
 
-	public int getRoamTime() {
-		return this.roamtime;
-	}
+    public void startGame() {
+        this.status = Status.RUNNING;
+        if (Config.spawnmobs) {
+            this.spawner = new Spawner(this, Config.spawnmobsinterval);
+        }
+        if (Config.randomChest) {
+            this.chestdrop = new ChestDropTask(this);
+        }
+        this.timer = new TimerTask(this, this.time);
+        this.updateLobbyBlock();
+    }
 
-	public void join(Player p) {
-		if (status != Status.WAITING && status != Status.STOPPED && status != Status.COUNTDOWN) {
-			p.sendMessage(ChatColor.RED + "This arena is not ready! Please wait before joining!");
-		} else if (maxplayers <= players.size()) {
-			p.sendMessage(ChatColor.RED + name + " is currently full!");
-		} else {
-			if (p.isInsideVehicle()) {
-				p.leaveVehicle();
-			}
-			players.add(p.getName());
-			HG.plugin.players.put(p.getName(), new PlayerData(p, this));
-			p.teleport(pickSpawn());
-			heal(p);
-			freeze(p);
-			if (players.size() >= minplayers && status.equals(Status.WAITING)) {
-				startPreGame();
-			} else if (status == Status.WAITING) {
-				msgDef("&4(&3"+p.getName() + "&b Has joined the game"+(minplayers-players.size()<= 0?"!":": "+(minplayers-players.size())+" players to start!")+"&4)");
-			}
-			kitHelp(p);
-			if (players.size() == 1)
-				status = Status.WAITING;
-			updateLobbyBlock();
-			sb.setSB(p);
-			sb.setAlive();
-		}
-	}
+    public void addSpawn(Location l) {
+        this.spawns.add(l);
+    }
 
-	public void kitHelp(Player p) {
-		String kit = HG.plugin.kit.getKitList();
-		Util.scm(p, "&8     ");
-		Util.scm(p, "&9&l>----------[&b&lWelcome to HungerGames&9&l]----------<");
-		Util.scm(p, "&9&l - &bPick a kit using &c/hg kit <kit-name>");
-		Util.scm(p, "&9&lKits:&b" + kit);
-		Util.scm(p, "&9&l>------------------------------------------<");
-	}
+    public Location pickSpawn() {
+        int spawn = this.players.size() - 1;
+        if (this.containsPlayer(this.spawns.get(spawn))) {
+            for (Location l : this.spawns) {
+                if (this.containsPlayer(l)) continue;
+                return l;
+            }
+        }
+        return this.spawns.get(spawn);
+    }
 
-	public void respawnAll() {
-		for (String st : players) {
-			Player p = Bukkit.getPlayer(st);
-			if (p != null)
-				p.teleport(pickSpawn());
-		}
-	}
+    public boolean containsPlayer(Location l) {
+        if (l == null) {
+            return false;
+        }
+        for (UUID s : this.players) {
+            Player p = Bukkit.getPlayer((UUID)s);
+            if (p == null || !p.getLocation().getBlock().equals((Object)l.getBlock())) continue;
+            return true;
+        }
+        return false;
+    }
 
-	public void startPreGame() {
-		setStatus(Status.COUNTDOWN);
-		starting = new StartingTask(this);
-		updateLobbyBlock();
-	}
+    public void msgAll(String s) {
+        for (UUID st : this.players) {
+            Player p = Bukkit.getPlayer((UUID)st);
+            if (p == null) continue;
+            Util.msg((CommandSender)p, s);
+        }
+    }
 
-	public void startFreeRoam() {
-		status = Status.BEGINNING;
-		HG.manager.restoreChests(this);
-		b.removeEntities();
-		freeroam = new FreeRoamTask(this);
-	}
+    public void msgDef(String s) {
+        for (UUID st : this.players) {
+            Player p = Bukkit.getPlayer((UUID)st);
+            if (p == null) continue;
+            Util.scm((CommandSender)p, s);
+        }
+    }
 
-	public void startGame() {
-		status = Status.RUNNING;
-		if (Config.spawnmobs) spawner = new Spawner(this, Config.spawnmobsinterval);
-		if (Config.randomChest) chestdrop = new ChestDropTask(this);
-		timer = new TimerTask(this, time);
-		updateLobbyBlock();
-	}
+    public void updateLobbyBlock() {
+        this.s1.setLine(1, this.status.getName());
+        this.s2.setLine(1, (Object)ChatColor.BOLD + "" + this.players.size() + "/" + this.maxplayers);
+        this.s1.update(true);
+        this.s2.update(true);
+    }
 
+    public void heal(Player p) {
+        for (PotionEffect ef : p.getActivePotionEffects()) {
+            p.removePotionEffect(ef.getType());
+        }
+        p.setHealth(20.0);
+        p.setFoodLevel(20);
+        p.setFireTicks(0);
+    }
 
-	public void addSpawn(Location l) {
-		this.spawns.add(l);
-	}
+    public void freeze(Player p) {
+        p.addPotionEffect(new PotionEffect(PotionEffectType.JUMP, 23423525, -10));
+        p.setWalkSpeed(1.0E-4f);
+        p.setFoodLevel(1);
+        p.setAllowFlight(false);
+        p.setFlying(false);
+        p.setGameMode(GameMode.SURVIVAL);
+    }
 
-	public Location pickSpawn() {
-		int spawn = players.size() - 1;
-		if (containsPlayer(spawns.get(spawn))) {
-			for (Location l : spawns) {
-				if (!containsPlayer(l)) {
-					return l;
-				}
-			}
-		}
-		return spawns.get(spawn);
-	}
+    public void unFreeze(Player p) {
+        p.removePotionEffect(PotionEffectType.JUMP);
+        p.setWalkSpeed(0.2f);
+    }
 
-	public boolean containsPlayer(Location l) {
-		if (l == null) return false;
-
-		for (String s : players) {
-			Player p = Bukkit.getPlayer(s);
-			if (p != null && p.getLocation().getBlock().equals(l.getBlock()))
-				return true;
-		}
-		return false;
-	}
-
-	public void msgAll(String s) {
-		for (String st : players) {
-			Player p = Bukkit.getPlayer(st);
-			if (p != null)
-				Util.msg(p, s);
-		}
-	}
-
-	public void msgDef(String s) {
-		for (String st : players) {
-			Player p = Bukkit.getPlayer(st);
-			if (p != null)
-				Util.scm(p, s);
-		}
-	}
-
-	public void updateLobbyBlock() {
-		s1.setLine(1, status.getName());
-		s2.setLine(1, ChatColor.BOLD + "" + players.size() + "/" + maxplayers);
-		s1.update(true);
-		s2.update(true);
-	}
-
-	public void heal(Player p) {
-		for (PotionEffect ef : p.getActivePotionEffects()) {
-			p.removePotionEffect(ef.getType());
-		}
-		p.setHealth(20);
-		p.setFoodLevel(20);
-		p.setFireTicks(0);
-	}
-
-	public void freeze(Player p) {
-		p.addPotionEffect(new PotionEffect(PotionEffectType.JUMP, 23423525, -10));
-		p.setWalkSpeed(0.0001F);
-		p.setFoodLevel(1);
-		p.setAllowFlight(false);
-		p.setFlying(false);
-		p.setGameMode(GameMode.SURVIVAL);
-	}
-
-	public void unFreeze(Player p) {
-		p.removePotionEffect(PotionEffectType.JUMP);
-		p.setWalkSpeed(0.2F);
-	}
-
-	public boolean setLobbyBlock(Sign sign) {
-		try {
-			this.s = sign;
-			Block c = s.getBlock();
-			@SuppressWarnings("deprecation")
+    public boolean setLobbyBlock(Sign sign) {
+        try {
+            this.s = sign;
+            Block c = this.s.getBlock();
+            @SuppressWarnings("deprecation")
 			BlockFace face = Util.getSignFace(c.getData());
-			this.s1 = (Sign) c.getRelative(face).getState();
-			this.s2 = (Sign) s1.getBlock().getRelative(face).getState();
+            this.s1 = (Sign)c.getRelative(face).getState();
+            this.s2 = (Sign)this.s1.getBlock().getRelative(face).getState();
+            this.s.setLine(0, (Object)ChatColor.DARK_BLUE + "" + (Object)ChatColor.BOLD + "HungerGames");
+            this.s.setLine(1, (Object)ChatColor.BOLD + ""  + this.name);
+            this.s.setLine(2, (Object)ChatColor.BOLD + ""  + "Click To Join");
+            this.s1.setLine(0, (Object)ChatColor.DARK_BLUE + ""  + (Object)ChatColor.BOLD + "Game Status");
+            this.s1.setLine(1, this.status.getName());
+            this.s2.setLine(0, (Object)ChatColor.DARK_BLUE + ""  + (Object)ChatColor.BOLD + "Alive");
+            this.s2.setLine(1, (Object)ChatColor.BOLD + ""  + 0 + "/" + this.maxplayers);
+            this.s.update(true);
+            this.s1.update(true);
+            this.s2.update(true);
+        }
+        catch (Exception e) {
+            return false;
+        }
+        try {
+            String[] h = HG.plugin.getConfig().getString("settings.globalexit").split(":");
+            this.exit = new Location(Bukkit.getServer().getWorld(h[0]), (double)Integer.parseInt(h[1]) + 0.5, (double)Integer.parseInt(h[2]) + 0.1, (double)Integer.parseInt(h[3]) + 0.5, Float.parseFloat(h[4]), Float.parseFloat(h[5]));
+        }
+        catch (Exception e) {
+            this.exit = this.s.getWorld().getSpawnLocation();
+        }
+        return true;
+    }
 
-			s.setLine(0, ChatColor.DARK_BLUE + "" + ChatColor.BOLD + "HungerGames");
-			s.setLine(1, ChatColor.BOLD + name);
-			s.setLine(2, ChatColor.BOLD + "Click To Join");
-			s1.setLine(0, ChatColor.DARK_BLUE + "" + ChatColor.BOLD + "Game Status");
-			s1.setLine(1, status.getName());
-			s2.setLine(0, ChatColor.DARK_BLUE + "" + ChatColor.BOLD + "Alive");
-			s2.setLine(1, ChatColor.BOLD + "" + 0 + "/" + maxplayers);
-			s.update(true);
-			s1.update(true);
-			s2.update(true);
-		} catch (Exception e) { return false; }
-		try {
-			String[] h = HG.plugin.getConfig().getString("settings.globalexit").split(":");
-			this.exit = new Location(Bukkit.getServer().getWorld(h[0]), Integer.parseInt(h[1]) + 0.5, Integer.parseInt(h[2]) + 0.1, Integer.parseInt(h[3]) + 0.5, Float.parseFloat(h[4]), Float.parseFloat(h[5]));
-		} catch (Exception e) {
-			this.exit = s.getWorld().getSpawnLocation();
-		}
-		return true;
-	}
+    public void setExit(Location l) {
+        this.exit = l;
+    }
 
-	public void setExit(Location l) {
-		this.exit = l;
-	}
+    public void cancelTasks() {
+        if (this.spawner != null) {
+            this.spawner.stop();
+        }
+        if (this.timer != null) {
+            this.timer.stop();
+        }
+        if (this.starting != null) {
+            this.starting.stop();
+        }
+        if (this.freeroam != null) {
+            this.freeroam.stop();
+        }
+        if (this.chestdrop != null) {
+            this.chestdrop.shutdown();
+        }
+    }
 
-	public void cancelTasks() {
-		if (spawner != null) spawner.stop();
-		if (timer != null) timer.stop();
-		if (starting != null) starting.stop();
-		if (freeroam != null) freeroam.stop();
-		if (chestdrop != null) chestdrop.shutdown();
-	}
+    public void stop() {
+        ArrayList<UUID> win = new ArrayList<UUID>();
+        this.cancelTasks();
+        for (UUID s : this.players) {
+            Player p = Bukkit.getPlayer((UUID)s);
+            if (p == null) continue;
+            this.heal(p);
+            this.exit(p);
+            HG.plugin.players.get(p.getUniqueId()).restore(p);
+            HG.plugin.players.remove(p.getUniqueId());
+            win.add(p.getUniqueId());
+            this.sb.restoreSB(p);
+        }
+        this.players.clear();
+        if (!win.isEmpty() && Config.giveReward) {
+            double db = Config.cash / win.size();
+            for (UUID s2 : win) {
+                Player p = Bukkit.getPlayer((UUID)s2);
+                if (p != null) {
+                    Vault.economy.depositPlayer((OfflinePlayer)p, db);
+                }
+                Util.msg((CommandSender)p, "&aYou won " + db + " for winning HungerGames!");
+            }
+        }
+        Util.broadcast("&l&3" + Util.translateStop(win) + " &l&bWon HungerGames at arena " + this.name + "!");
+        if (!this.blocks.isEmpty()) {
+            new me.minebuilders.hg.Rollback(this);
+        } else {
+            this.status = Status.STOPPED;
+            this.updateLobbyBlock();
+        }
+        this.b.removeEntities();
+        this.sb.resetAlive();
+    }
 
-	public void stop() {
-		List<String> win = new ArrayList<String>();
-		cancelTasks();
-		for (String s : players) {
-			Player p = Bukkit.getPlayer(s);
-			if (p != null) {
-				heal(p);
-				exit(p);
-				HG.plugin.players.get(p.getName()).restore(p);
-				HG.plugin.players.remove(p.getName());
-				win.add(p.getName());
-				sb.restoreSB(p);
-			}
-		}
-		players.clear();
+    public void leave(Player p) {
+        this.players.remove(p.getUniqueId());
+        this.unFreeze(p);
+        this.heal(p);
+        this.exit(p);
+        HG.plugin.players.get(p.getUniqueId()).restore(p);
+        HG.plugin.players.remove(p.getUniqueId());
+        if (this.status == Status.RUNNING || this.status == Status.BEGINNING) {
+            if (this.isGameOver()) {
+                this.stop();
+            }
+        } else if (this.status == Status.WAITING) {
+            this.msgDef("&3&l" + p.getName() + "&l&c Has left the game" + (this.minplayers - this.players.size() <= 0 ? "!" : new StringBuilder(": ").append(this.minplayers - this.players.size()).append(" players to start!").toString()));
+        }
+        this.updateLobbyBlock();
+        this.sb.restoreSB(p);
+        this.sb.setAlive();
+    }
 
-		if (!win.isEmpty() && Config.giveReward) {
-			double db = Config.cash / win.size();
+    public boolean isGameOver() {
+        if (this.players.size() <= 1) {
+            return true;
+        }
+        for (Map.Entry<UUID, PlayerData> f : HG.plugin.players.entrySet()) {
+            Team t = f.getValue().getTeam();
+            if (t == null || t.getPlayers().size() < this.players.size()) continue;
+            List<UUID> ps = t.getPlayers();
+            for (UUID s : this.players) {
+                if (ps.contains(s)) continue;
+                return false;
+            }
+            return true;
+        }
+        return false;
+    }
 
-			for (String s : win) {
-				Vault.economy.depositPlayer(s, db);
-				Player p = Bukkit.getPlayer(s);
-				if (p != null)
-				Util.msg(p, "&aYou won " + db + " for winning HungerGames!");
-			}
-		}
+    public void addChests(Location b) {
+        this.chests.add(b);
+    }
 
-		Util.broadcast("&l&3" + Util.translateStop(win) + " &l&bWon HungerGames at arena " + name + "!");
-		if (!blocks.isEmpty()) {
-			new Rollback(this);
-		} else {
-			status = Status.STOPPED;
-			updateLobbyBlock();
-		}
-		b.removeEntities();
-		sb.resetAlive();
-	}
+    public ArrayList<Location> getChests() {
+        return this.chests;
+    }
 
-	public void leave(Player p) {
-		players.remove(p.getName());
-		unFreeze(p);
-		heal(p);
-		exit(p);
-		HG.plugin.players.get(p.getName()).restore(p);
-		HG.plugin.players.remove(p.getName());
-		if (status == Status.RUNNING || status == Status.BEGINNING) {
-			if (isGameOver()) {
-				stop();
-			}
-		} else if (status == Status.WAITING) {
-			msgDef("&3&l"+p.getName() + "&l&c Has left the game"+(minplayers-players.size()<= 0?"!":": "+(minplayers-players.size())+" players to start!"));
-		}
-		updateLobbyBlock();
-		sb.restoreSB(p);
-		sb.setAlive();
-	}
+    public void exit(Player p) {
+        Util.clearInv(p);
+        if (this.exit == null) {
+            p.teleport(this.s.getWorld().getSpawnLocation());
+        } else {
+            p.teleport(this.exit);
+        }
+    }
 
-	public boolean isGameOver() {
-		if (players.size() <= 1) return true; 
-		for (Entry<String, PlayerData> f : HG.plugin.players.entrySet()) {
+    public int getMaxPlayers() {
+        return this.maxplayers;
+    }
 
-			Team t = f.getValue().getTeam();
-
-			if (t != null && (t.getPlayers().size() >= players.size())) {
-				List<String> ps = t.getPlayers();
-				for (String s : players) {
-					if (!ps.contains(s)) {
-						return false;
-					}
-				}
-				return true;
-			}
-		}
-		return false;
-	}
-
-	public void addChests(Location b) {
-		chests.add(b);
-	}
-
-	public ArrayList<Location> getChests() {
-		return chests;
-	}
-
-	public void exit(Player p) {
-		Util.clearInv(p);
-		if (this.exit == null) {
-			p.teleport(s.getWorld().getSpawnLocation());
-		} else {
-			p.teleport(this.exit);
-		}
-	}
-
-	public int getMaxPlayers() {
-		return maxplayers;
-	}
-
-	public boolean isLobbyValid() {
-		try {
-			if (s instanceof Sign && s1 instanceof Sign && s2 instanceof Sign) {
-				return true;
-			}
-		} catch (Exception e) { 
-			return false;
-		}
-		return false;
-	}
+    public boolean isLobbyValid() {
+        try {
+            if (this.s instanceof Sign && this.s1 instanceof Sign && this.s2 instanceof Sign) {
+                return true;
+            }
+        }
+        catch (Exception e) {
+            return false;
+        }
+        return false;
+    }
 }
+

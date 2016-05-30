@@ -2,52 +2,53 @@ package me.minebuilders.hg;
 
 import java.util.ArrayList;
 import java.util.List;
-
+import java.util.UUID;
+import me.minebuilders.hg.Util;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 public class Team {
+    private Player leader;
+    private List<UUID> players = new ArrayList<UUID>();
+    private List<UUID> pending = new ArrayList<UUID>();
 
-	private String leader;
-	private List<String> players = new ArrayList<String>();
-	private List<String> pending = new ArrayList<String>();
-	
-	public Team(String leader) {
-		this.leader = leader;
-		players.add(leader);
-	}
-	
-	
-	public void invite(Player p) {
-		Util.scm(p, "&6*&b&m                                                                             &6*");
-		Util.scm(p, "| &f" + leader + " &3Just invited you to a &fTeam&3!");
-		Util.scm(p, "| &3Type &f/hg team accept &3To join!");
-		Util.scm(p, "&6*&b&m                                                                             &6*");
-		pending.add(p.getName());
-	}
-	
-	public void acceptInvite(Player p) {
-		pending.remove(p.getName());
-		players.add(p.getName());
-		Util.msg(p, "&3You successfully joined this team!");
-	}
-	
-	public boolean isOnTeam(String p) {
-		return (players.contains(p));
-	}
-	
-	public boolean isPending(String p) {
-		return (pending.contains(p));
-	}
-	
-	public List<String> getPlayers() {
-		return players;
-	}
-	
-	public List<String> getPenders() {
-		return pending;
-	}
-	
-	public String getLeader() {
-		return leader;
-	}
+    public Team(Player leader) {
+        this.leader = leader;
+        this.players.add(leader.getUniqueId());
+    }
+
+    public void invite(Player p) {
+        Util.scm((CommandSender)p, "&6*&b&m                                                                             &6*");
+        Util.scm((CommandSender)p, "| &f" + this.leader.getName() + " &3Just invited you to a &fTeam&3!");
+        Util.scm((CommandSender)p, "| &3Type &f/hg team accept &3To join!");
+        Util.scm((CommandSender)p, "&6*&b&m                                                                             &6*");
+        this.pending.add(p.getUniqueId());
+    }
+
+    public void acceptInvite(Player p) {
+        this.pending.remove(p.getUniqueId());
+        this.players.add(p.getUniqueId());
+        Util.msg((CommandSender)p, "&3You successfully joined this team!");
+    }
+
+    public boolean isOnTeam(UUID p) {
+        return this.players.contains(p);
+    }
+
+    public boolean isPending(String p) {
+        return this.pending.contains(p);
+    }
+
+    public List<UUID> getPlayers() {
+        return this.players;
+    }
+
+    public List<UUID> getPenders() {
+        return this.pending;
+    }
+
+    public Player getLeader() {
+        return this.leader;
+    }
 }
+

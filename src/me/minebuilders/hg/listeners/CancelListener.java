@@ -37,14 +37,17 @@ public class CancelListener implements Listener {
 			event.setCancelled(true);
 			Util.msg(player, ChatColor.RED + "You can not use non-hungergames commands while ingame!");
 		} else if ("/tp".equalsIgnoreCase(st[0]) && st.length >= 2) {
-			Player p = Bukkit.getServer().getPlayer(st[1]);
-			if (p != null) {
-				if (plugin.players.containsKey(p.getName())) {
-					player.sendMessage(ChatColor.RED+"This player is currently playing Hungergames!");
-					event.setMessage("/");
-					event.setCancelled(true);
-				}
-			}
+            Player p = null;
+            for (Player tmpPlayer : Bukkit.getOnlinePlayers()) {
+                if (!tmpPlayer.getName().equalsIgnoreCase(st[1])) continue;
+                p = tmpPlayer;
+                break;
+            }
+            if (p != null && this.plugin.players.containsKey(p.getName())) {
+                player.sendMessage((Object)ChatColor.RED + "This player is currently playing Hungergames!");
+                event.setMessage("/");
+                event.setCancelled(true);
+            }
 		} 
 	}
 }

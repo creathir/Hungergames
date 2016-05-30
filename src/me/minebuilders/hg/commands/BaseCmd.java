@@ -29,10 +29,10 @@ public abstract class BaseCmd {
 		}
 		if (!s.hasPermission("hg." + cmdName))
 			sender.sendMessage(ChatColor.RED + "You do not have permission to use: " + ChatColor.GOLD + "/hg " + cmdName);
-		else if (forceInGame && !HG.plugin.players.containsKey(player.getName()))
-			sender.sendMessage(ChatColor.RED + "Your not in a valid game!");
+		else if (forceInGame && !HG.plugin.players.containsKey(player.getUniqueId()))
+			sender.sendMessage(ChatColor.RED + "You're not in a valid game!");
 		else if (forceInRegion && !HG.manager.isInRegion(player.getLocation()))
-			sender.sendMessage(ChatColor.RED + "Your not in a valid HungerGames region!");
+			sender.sendMessage(ChatColor.RED + "You're not in a valid HungerGames region!");
 		else if (argLength > arg.length)
 		Util.scm(s, "&4Wrong usage: " + sendHelpLine());
 		else return run();
